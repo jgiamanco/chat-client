@@ -1,86 +1,123 @@
-import type {
-  ChannelFilters,
-  ChannelSort,
-  ChannelOptions,
-  User,
-} from "stream-chat";
+import { useState } from "react";
+import type { ChannelFilters, ChannelOptions, ChannelSort } from "stream-chat";
 import {
-  useCreateChatClient,
-  Chat,
   Channel,
-  ChannelHeader,
-  ChannelList,
-  MessageInput,
-  MessageList,
+  Chat,
+  ChatView,
   Thread,
-  Window,
+  ThreadList,
+  useCreateChatClient,
 } from "stream-chat-react";
+import clsx from "clsx";
 import { EmojiPicker } from "stream-chat-react/emojis";
-import "stream-chat-react/dist/css/v2/index.css";
 
-import "./layout.css";
-
-import { init, SearchIndex } from "emoji-mart";
 import data from "@emoji-mart/data";
+import { init, SearchIndex } from "emoji-mart";
 
-import { CustomMessage } from "./custom-components/CustomMessage";
-import { CustomChannelPreview } from "./custom-components/CustomChannelPreview";
-import { CustomAttachment } from "./custom-components/CustomAttachment";
+import "stream-chat-react/dist/css/v2/index.css";
+import "./styles/index.css";
 
-// your Stream app information
-const apiKey = process.env.REACT_APP_STREAM_API_KEY;
-const userId = "jay5myth";
-const userName = "Jay";
-const userToken =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiamF5NW15dGgifQ.iPWu9geoapbHLSYuIpBcz27P2g7vHKvwywbt-GsZfb4";
+import {
+  ChannelInner,
+  CreateChannel,
+  MessagingSidebar,
+  MessagingThreadHeader,
+  SendButton,
+} from "./components";
 
-const user: User = {
-  id: userId,
-  name: userName,
-  image: `https://getstream.io/random_png/?name=${userName}`,
-};
+import { GiphyContextProvider } from "./context";
 
-const sort: ChannelSort = { last_message_at: -1 };
-const filters: ChannelFilters = {
-  type: "messaging",
-  members: { $in: [userId] },
-};
-const options: ChannelOptions = {
-  limit: 10,
-};
+import {
+  useChecklist,
+  useMobileView,
+  useUpdateAppHeightOnResize,
+  useThemeContext,
+} from "./hooks";
+
+import type { StreamChatGenerics } from "./types.ts";
 
 init({ data });
 
-const App = () => {
-  const client = useCreateChatClient({
-    apiKey,
-    tokenOrProvider: userToken,
-    userData: user,
-  });
+type AppProps = {
+  apiKey: string;
+  userToConnect: { id: string; name?: string; image?: string };
+  userToken: string | undefined;
+  targetOrigin: string;
+  channelListOptions: {
+    options: ChannelOptions;
+    filters: ChannelFilters;
+    sort: ChannelSort;
+  };
+};
 
-  if (!client) return <div>Setting up client & connection...</div>;
+const EmojiPickerWithTheme = () => {
+  const { theme } = useThemeContext();
+
+  return <EmojiPicker pickerProps={{ theme }} />;
+};
+
+const App = (props: AppProps) => {
+  const { apiKey, userToConnect, userToken, targetOrigin, channelListOptions } =
+    props;
+  const [isCreating, setIsCreating] = useState(false);
+
+  const chatClient = useCreateChatClient<StreamChatGenerics>({
+    apiKey,
+    userData: userToConnect,
+    tokenOrProvider: userToken,
+  });
+  const toggleMobile = useMobileView();
+  const { themeClassName } = useThemeContext();
+
+  useChecklist(chatClient, targetOrigin);
+  useUpdateAppHeightOnResize();
+
+  if (!chatClient) {
+    return null; // render nothing until connection to the backend is established
+  }
 
   return (
-    <Chat client={client} theme="str-chat__theme-custom">
-      <ChannelList
-        Preview={CustomChannelPreview}
-        filters={filters}
-        sort={sort}
-        options={options}
-      />
-      <Channel
-        EmojiPicker={EmojiPicker}
-        emojiSearchIndex={SearchIndex}
-        Attachment={CustomAttachment}
-        Message={CustomMessage}
-      >
-        <Window>
-          <ChannelHeader />
-          <MessageList />
-          <MessageInput />
-        </Window>
-        <Thread />
-      </Channel>
+    <Chat client={chatClient} theme={clsx("messaging", themeClassName)}>
+      <ChatView>
+        <ChatView.Selector />
+        <ChatView.Channels>
+          <MessagingSidebar
+            channelListOptions={channelListOptions}
+            onClick={toggleMobile}
+            onCreateChannel={() => setIsCreating(!isCreating)}
+            onPreviewSelect={() => setIsCreating(false)}
+          />
+          <Channel
+            maxNumberOfFiles={10}
+            multipleUploads={true}
+            SendButton={SendButton}
+            ThreadHeader={MessagingThreadHeader}
+            TypingIndicator={() => null}
+            EmojiPicker={EmojiPickerWithTheme}
+            emojiSearchIndex={SearchIndex}
+            enrichURLForPreview
+          >
+            {isCreating && (
+              <CreateChannel
+                toggleMobile={toggleMobile}
+                onClose={() => setIsCreating(false)}
+              />
+            )}
+            <GiphyContextProvider>
+              <ChannelInner
+                theme={themeClassName}
+                toggleMobile={toggleMobile}
+              />
+            </GiphyContextProvider>
+          </Channel>
+        </ChatView.Channels>
+        <ChatView.Threads>
+          <ThreadList />
+          <ChatView.ThreadAdapter>
+            <Thread virtualized />
+          </ChatView.ThreadAdapter>
+        </ChatView.Threads>
+      </ChatView>
     </Chat>
   );
 };

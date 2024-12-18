@@ -1,9 +1,59 @@
-// import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import * as Sentry from "@sentry/react";
+import "./App.css";
 
-createRoot(document.getElementById("root")!).render(
-  // <StrictMode>
-  <App />
-  // </StrictMode>
+import App from "./App";
+import { getImage } from "./assets";
+import { getChannelListOptions } from "./channelListOptions";
+import { ThemeContextProvider } from "./context";
+import { UserResponse } from "stream-chat";
+import { StreamChatGenerics } from "./types";
+
+if (process.env.NODE_ENV === "production") {
+  Sentry.init({
+    dsn: "https://cfe9b30508b44e40908da83aee0743e9@o389650.ingest.sentry.io/5556314",
+    integrations: [Sentry.browserTracingIntegration()],
+    tracesSampleRate: 1.0,
+  });
+}
+
+const urlParams = new URLSearchParams(window.location.search);
+const apiKey = urlParams.get("api_key") || process.env.REACT_APP_STREAM_API_KEY;
+const user = urlParams.get("user") || process.env.REACT_APP_USER_ID;
+const userToken =
+  urlParams.get("user_token") || process.env.REACT_APP_USER_TOKEN;
+const targetOrigin =
+  urlParams.get("target_origin") ||
+  (process.env.REACT_APP_TARGET_ORIGIN as string);
+
+const noChannelNameFilter = urlParams.get("no_channel_name_filter") || true;
+const skipNameImageSet = urlParams.get("skip_name_image_set") || false;
+
+const channelListOptions = getChannelListOptions(!!noChannelNameFilter, user);
+const userToConnect: UserResponse<StreamChatGenerics> = {
+  id: user!,
+  name: skipNameImageSet ? undefined : user!,
+  image: skipNameImageSet ? undefined : getImage(user!),
+  privacy_settings: {
+    typing_indicators: {
+      enabled: false,
+    },
+  },
+};
+
+const container = document.getElementById("root");
+const root = ReactDOM.createRoot(container!);
+root.render(
+  <React.StrictMode>
+    <ThemeContextProvider targetOrigin={targetOrigin}>
+      <App
+        apiKey={apiKey!}
+        userToConnect={userToConnect}
+        userToken={userToken}
+        targetOrigin={targetOrigin!}
+        channelListOptions={channelListOptions}
+      />
+    </ThemeContextProvider>
+  </React.StrictMode>
 );
