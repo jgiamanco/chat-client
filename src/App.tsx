@@ -28,7 +28,7 @@ import { CustomChannelPreview } from "./custom-components/CustomChannelPreview";
 import { CustomAttachment } from "./custom-components/CustomAttachment";
 
 // your Stream app information
-const apiKey = process.env.REACT_APP_STREAM_API_KEY!;
+const apiKey = process.env.REACT_APP_STREAM_API_KEY;
 const userId = "jay5myth";
 const userName = "Jay";
 const userToken =
